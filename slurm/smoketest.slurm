@@ -17,6 +17,7 @@ cd "$SLURM_SUBMIT_DIR"
 source env.sh
 export HF_HUB_OFFLINE=1  # models/data were pre-downloaded by setup_env.sh
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+export PYTHONUNBUFFERED=1  # stream training logs to logs/*.out as they happen
 
 echo "Job $SLURM_JOB_ID on $(hostname) | partition=$SLURM_JOB_PARTITION | cpus=$SLURM_CPUS_PER_TASK | CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
 nvidia-smi
