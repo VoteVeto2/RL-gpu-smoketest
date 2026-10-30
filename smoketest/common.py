@@ -13,7 +13,9 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 STUDENT = os.environ.get("STUDENT_MODEL", "Qwen/Qwen3.5-0.8B")
 TEACHER = os.environ.get("TEACHER_MODEL", "Qwen/Qwen3.5-2B")
-PROMPT_SUFFIX = "Think step by step, then give the final answer on the last line as '#### <number>'."
+# "briefly" matters: without it the 0.8B model rambles past max_completion_length, never writes
+# '####', and GRPO gets all-zero rewards (zero advantage -> zero gradient).
+PROMPT_SUFFIX = "Solve briefly in a few short steps, then give the final answer on the last line as '#### <number>'."
 
 
 def parse_args(default_steps):
@@ -89,7 +91,8 @@ def gsm8k(n):
 
 
 def train_and_report(trainer, stage, args, prec):
-    """Train, save the LoRA adapter, write summary.json, and fail loudly on a non-finite loss."""
+    """Train, save the LoRA adapter, write summary.json, and fail loudly on a non-finite loss
+    or when no step produced a gradient (training ran but learned nothing)."""
     if torch.cuda.is_available():
         torch.cuda.reset_peak_memory_stats()
     result = trainer.train()
@@ -107,6 +110,7 @@ def train_and_report(trainer, stage, args, prec):
         "first_loss": logs[0]["loss"] if logs else None,
         "last_loss": logs[-1]["loss"] if logs else None,
         "last_reward": logs[-1].get("reward") if logs else None,
+        "max_grad_norm": max((h.get("grad_norm", 0.0) for h in logs), default=0.0),
         "node": socket.gethostname(),
         "slurm_job_id": os.environ.get("SLURM_JOB_ID"),
     }
@@ -116,3 +120,5 @@ def train_and_report(trainer, stage, args, prec):
 
     if summary["last_loss"] is None or not math.isfinite(summary["last_loss"]):
         raise SystemExit(f"[{stage}] loss is not finite: {summary['last_loss']}")
+    if not summary["max_grad_norm"] > 0:
+        raise SystemExit(f"[{stage}] grad_norm was 0 at every step -- no learning signal")

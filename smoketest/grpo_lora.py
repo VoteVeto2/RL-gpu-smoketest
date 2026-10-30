@@ -37,7 +37,7 @@ def main():
         **trainer_kwargs(args, prec),
         per_device_train_batch_size=8,  # counted in completions: 2 prompts x 4 generations
         num_generations=4,
-        max_completion_length=128,
+        max_completion_length=256,
         learning_rate=1e-5,
         temperature=1.0,
     )

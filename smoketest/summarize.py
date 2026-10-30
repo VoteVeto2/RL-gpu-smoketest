@@ -7,7 +7,7 @@ import json
 import os
 import sys
 
-COLS = ["slurm_job_id", "stage", "gpu", "precision", "steps", "runtime_s", "s_per_step", "peak_mem_gb", "first_loss", "last_loss", "last_reward"]
+COLS = ["slurm_job_id", "stage", "gpu", "precision", "steps", "runtime_s", "s_per_step", "peak_mem_gb", "first_loss", "last_loss", "last_reward", "max_grad_norm"]
 
 
 def main():
