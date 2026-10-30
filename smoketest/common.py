@@ -99,6 +99,8 @@ def train_and_report(trainer, stage, args, prec):
     trainer.save_model(args.output_dir)
 
     logs = [h for h in trainer.state.log_history if "loss" in h]
+    grad_norms = [h["grad_norm"] for h in logs if "grad_norm" in h]
+    finite_grad_norms = [g for g in grad_norms if math.isfinite(g)]
     summary = {
         "stage": stage,
         "gpu": torch.cuda.get_device_name() if torch.cuda.is_available() else "cpu",
@@ -110,7 +112,9 @@ def train_and_report(trainer, stage, args, prec):
         "first_loss": logs[0]["loss"] if logs else None,
         "last_loss": logs[-1]["loss"] if logs else None,
         "last_reward": logs[-1].get("reward") if logs else None,
-        "max_grad_norm": max((h.get("grad_norm", 0.0) for h in logs), default=0.0),
+        "max_grad_norm": max(finite_grad_norms, default=0.0),
+        # fp16 AMP (V100): GradScaler skips steps whose grads overflow and logs grad_norm=nan; expected early on.
+        "skipped_steps": len(grad_norms) - len(finite_grad_norms),
         "node": socket.gethostname(),
         "slurm_job_id": os.environ.get("SLURM_JOB_ID"),
     }
