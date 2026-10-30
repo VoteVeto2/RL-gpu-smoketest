@@ -142,6 +142,27 @@ source env.sh
 python -m smoketest.summarize $VSC_SCRATCH/rl-smoketest/*
 ```
 
+实测结果（2026-10-30，job 62474749 = V100，62474750 = A100 debug；单卡，GSM8K 64 条）：
+
+| Stage | GPU | 精度 | s/step | 峰值显存 GB | loss 首→末 | 末步 reward | 跳过步数* |
+|---|---|---|---|---|---|---|---|
+| sft_lora (20 步) | V100-SXM2 32GB | fp16 | 1.07 | 3.88 | 1.092 → 0.435 | – | 7 |
+| sft_lora (20 步) | A100 80GB PCIe | bf16 | 0.50 | 2.26 | 1.092 → 0.415 | – | 0 |
+| grpo_lora (10 步) | V100-SXM2 32GB | fp16 | 10.8 | 4.37 | – | 1.075 | 5 |
+| grpo_lora (10 步) | A100 80GB PCIe | bf16 | 10.3 | 2.69 | – | 0.70 | 0 |
+| distill_onpolicy (10 步) | V100-SXM2 32GB | fp16 | 6.21 | 11.11 | 0.227 → 0.213 | – | 0 |
+| distill_onpolicy (10 步) | A100 80GB PCIe | bf16 | 5.67 | 5.75 | 0.219 → 0.214 | – | 0 |
+
+整个 job：V100 4 分 35 秒，A100 4 分 04 秒（含模型加载）。
+
+\* fp16 AMP 的 GradScaler 在梯度溢出时会跳过该步并降低 loss scale（日志里 `grad_norm=nan`），前几步常见、属正常；bf16 没有这个问题。
+
+怎么读这张表：
+- SFT 是纯前向/反向，A100 约快 2×（matmul 实测：V100 fp16 95 TFLOPS，A100 bf16 252 TFLOPS）。
+- GRPO / 蒸馏的大部分时间花在逐 token 的 `generate` 上（还是 Qwen3.5 线性注意力的纯 PyTorch fallback），受 kernel 启动延迟限制，所以两种卡差不多。要发挥 A100 需要 vLLM 和 `flash-linear-attention`。
+- V100 上 fp32 权重 + fp16 AMP 比 A100 bf16 多用约一倍显存，但 0.8B/2B 都远没到上限。
+- GRPO 的 reward 和 loss 在 10 步里噪声很大，这里只检验"有学习信号"（grad_norm > 0），不代表效果。
+
 ## 6. 关于"预约"（reservation）
 
 Slurm 里"预约"有三种含义：
