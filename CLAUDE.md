@@ -14,6 +14,8 @@ See `README.md` for layout and the GPU booking tutorial.
 - Commit early and often, and push to `origin` (https://github.com/VoteVeto2/RL-gpu-smoketest.git, branch `main`).
 - Verify changes on a real GPU: `slurm/submit.sh v100|a100|a100-debug` (add `--export=ALL,STAGES=<stage>` to run one stage).
   A stage only passes if its loss is finite and grad_norm is non-zero at some step.
+- Don't waste compute: give jobs a tight `--time`, `scancel -M wice <id>` anything no longer needed,
+  and `exit` interactive sessions; check `squeue -M wice -u $USER` is empty when done.
 
 ## VSC gotchas
 
